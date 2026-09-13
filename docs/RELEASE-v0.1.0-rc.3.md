@@ -1,6 +1,8 @@
-# Windows Privacy Guard v0.1.0-rc.3 — pre-release
+# Windows Privacy Guard — First Public Release
 
-Test candidate for Windows 11. Not a stable/production release.
+The tested Windows 11 candidate is now a regular public release. The existing
+v0.1.0-rc.3 tag and asset filenames are retained so downloads continue to use
+the exact validated installer, without a rebuild or changed checksum.
 
 ## Download and install
 
@@ -12,9 +14,9 @@ Documents\WindowsPrivacyGuard directory and creates a desktop shortcut. Opening
 the control panel requests administrator approval; installation does not apply
 privacy settings or remove apps automatically.
 
-The supplied ZIP is the exact locally tested candidate. Its bundled README
-predates publication links; repository documentation has additional release
-instructions. Runtime scripts and recorder source are unchanged.
+The supplied ZIP is the exact tested installer. Its bundled README predates
+release promotion; repository documentation has current release instructions.
+Runtime scripts and recorder source are unchanged.
 
 SHA-256:
 
@@ -32,10 +34,11 @@ SHA-256:
 - Includes a separate local WAV recorder.
 - Does not guarantee zero telemetry, intercept TLS, disable Defender, or disable
   Windows Update.
-- Unsigned: public download/reputation warning behavior has not yet been tested.
-  Do not disable security protections to install it.
+- Unsigned. The test PC completed the public GitHub download and installation
+  without warnings. Other PCs may show prompts; do not disable security
+  protections to install it.
 
 Two local package-test rounds, repeated regression checks, manual installation,
 automatic panel launch, and Documents shortcut launch after reboot completed.
-See docs/TESTING.md for scope and remaining gaps. Public GitHub download testing
-is the next validation step, not a completed result.
+Public GitHub download and installation also completed successfully, with no
+warnings reported by the user. See docs/TESTING.md for validation scope.

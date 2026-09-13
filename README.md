@@ -2,8 +2,9 @@
 
 An audit-first, reversible Windows 11 privacy baseline.
 
-**Pre-release: 0.1.0-rc.3.** This is a test candidate, not a guarantee of complete
-privacy or compatibility with every Windows installation. Use the packaged ZIP
+**Public release: tested build 0.1.0-rc.3.** The validated candidate has been
+promoted to a regular release; its tag and installer bytes are unchanged.
+Use the packaged ZIP
 from [GitHub Releases](https://github.com/smithc580-lgtm/windows-privacy-guard/releases/tag/v0.1.0-rc.3),
 not GitHub's automatic source-code ZIP, for the installer with its manifest.
 See [validation scope and test instructions](docs/TESTING.md).
@@ -31,8 +32,8 @@ be placed there too; no sync settings are changed by the installer.
 The release is currently unsigned. Do not disable Defender or SmartScreen to
 install it. The manifest and ZIP checksum detect corruption, not a malicious
 replacement of the package and its checksums. Only run packages from a source
-you trust. A published download URL and real download-origin warning behavior
-still need validation before public release.
+you trust. Public GitHub download and installation were completed successfully
+on the test PC with no warnings reported. Other PCs may show security prompts.
 
 From a source checkout, double-click `WindowsPrivacyGuard.cmd` to launch the
 control panel. The older `DownloadAndLaunch.cmd` is a developer template with

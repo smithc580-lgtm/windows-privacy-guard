@@ -1,6 +1,7 @@
-# Pre-release validation
+# Release validation
 
-This is a Windows 11 test candidate, not a production-readiness guarantee.
+The tested Windows 11 candidate has been promoted to a regular public release.
+The original build tag and installer are retained unchanged.
 Machine-specific reports, recordings, VM images, credentials, and backup files
 are deliberately not committed to this repository.
 
@@ -50,6 +51,8 @@ not the real default location. Output ZIPs and generated files stay under dist/.
 - A browser-downloaded ZIP matched the tested release hash, passed two package
   test rounds, and was extracted and installed by the user. The installed panel
   opened automatically. That download used a local HTTP server, not GitHub.
+- The user subsequently completed public GitHub download and installation and
+  reported that it installed successfully without warnings on the test PC.
 
 ## Known gaps
 
@@ -58,8 +61,9 @@ user's desktop launch; the precise reason was not established. The tested
 default now uses Windows' configured Documents directory. Backups retain their
 original LocalAppData location; the installer does not migrate them.
 
-Public GitHub download and Windows reputation/security-prompt behavior remain
-to be checked. The release is unsigned. Do not disable Windows protections to
+The public-download installation check passed on the test PC; this does not
+guarantee the same warning behavior on every PC. The release is unsigned.
+Do not disable Windows protections to
 install it. SHA-256 checks establish file integrity, not publisher identity.
 The repository must not be described as guaranteeing zero telemetry or tested
 on every Windows edition, update, language, management policy, or device.
