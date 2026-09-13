@@ -1,11 +1,46 @@
 # Release validation
 
-The tested Windows 11 candidate has been promoted to a regular public release.
-The original build tag and installer are retained unchanged.
+Version 0.1.1 is the checkbox/provisioning update. Its release ZIP is the exact
+package used for the local installer tests and user desktop check. Repository
+documentation was updated for publication without rebuilding that tested ZIP.
+The previous release tag and installer are retained unchanged.
 Machine-specific reports, recordings, VM images, credentials, and backup files
 are deliberately not committed to this repository.
 
 ## Repeatable checks
+
+The 0.1.1 checkbox/provisioning update adds mocked tests for exact
+selection forwarding, check-all/uncheck-all, independent scope choices, empty
+selection refusal, protected/unknown/dependency rejection, changed identities,
+pre-removal inventories, and partial failures. These tests never run real
+package-removal commands. All nine safe suites passed twice. The earlier
+release validation below applies to the original release; the new 0.1.1
+checkbox/provisioning checks are recorded separately here.
+
+An agent-launched elevated process received `Access is denied` from the
+provisioning inventory query. The same read-only check subsequently passed in
+the user's administrator PowerShell, finding five installed optional entries
+and seven provisioned copies. The precise process-context difference remains
+unexplained. The UI reports inventory denial and lists only verified
+current-account choices; mocked tests cover this fallback.
+
+The user confirmed the source preview's Check all / individual uncheck /
+Uncheck all behavior. In the retained Windows 11 evaluation VM, two real
+removal rounds passed with Solitaire: first remove only its provisioned copy
+and verify installed registrations are unchanged, then remove its installed
+copy and verify every unchecked package remains unchanged. Both operation
+inventories reported completion. After each round, checkpoint restoration
+returned the installed and provisioned package lists to their original values.
+The VM was saved afterward. No host app-removal commands ran in this test.
+This validates that app on that guest, not every allowlisted app, other users'
+registrations, a newly created account, or behavior after a future Windows update.
+Checkpoint restoration is test infrastructure, not an app-undo feature.
+
+The exact 0.1.1 ZIP passed two install/reinstall test rounds, including preserved
+backups and old shortcuts, installed WPF TestMode, recorder compilation, and
+rejection of malformed packages. The user then installed it locally and
+confirmed the updated desktop panel and checkbox controls worked. This is not
+a new public-browser download or post-update reboot test.
 
 From Windows PowerShell 5.1 in a checkout:
 
@@ -23,7 +58,7 @@ Fixture files and that key are cleaned up; reports remain under ignored reports/
 Build and test a release package:
 
 ```powershell
-$release = .\scripts\Build-Release.ps1 -Version 0.1.0-rc.3 | ConvertFrom-Json
+$release = .\scripts\Build-Release.ps1 -Version 0.1.1 | ConvertFrom-Json
 .\tests\Test-ReleasePackage.ps1 -Archive $release.Archive -Rounds 2
 ```
 

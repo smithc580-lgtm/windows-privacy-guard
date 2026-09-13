@@ -80,8 +80,14 @@ function Get-GuardWindowBounds {
       <TextBlock Name="Status" Text="Checking current settings..." Foreground="#9FE3B1" FontSize="16" Margin="0,0,0,12" TextWrapping="Wrap"/>
       <TextBlock Name="Details" TextWrapping="Wrap" Foreground="#DDE6ED"/>
       <TextBlock Text="Optional consumer apps found" Foreground="White" FontWeight="Bold" Margin="0,20,0,6"/>
-      <ListBox Name="Candidates" Height="150" Background="#1B2A34" Foreground="White"/>
-      <TextBlock Foreground="#C9D3DC" TextWrapping="Wrap" Margin="0,8,0,0" Text="Cleanup removes all listed apps for the current user. Removed apps must be reinstalled manually; a backup is an inventory, not an app restore image."/>
+      <WrapPanel Margin="0,0,0,6">
+        <Button Name="CheckAll" Content="Check all" Padding="10,5" Margin="0,0,8,4"/>
+        <Button Name="UncheckAll" Content="Uncheck all" Padding="10,5" Margin="0,0,8,4"/>
+        <TextBlock Name="SelectionCount" Foreground="#C9D3DC" VerticalAlignment="Center"/>
+      </WrapPanel>
+      <TextBlock Name="ProvisionedNotice" Foreground="#FFD58A" TextWrapping="Wrap" Margin="0,0,0,6"/>
+      <ListBox Name="Candidates" Height="190" Background="#1B2A34" Foreground="White" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"/>
+      <TextBlock Foreground="#C9D3DC" TextWrapping="Wrap" Margin="0,8,0,0" Text="Only checked entries are removed. Each app may have two separate choices: this account, and provisioned for new accounts. Uncheck anything you want to keep. Refresh clears choices. Windows components and shared dependencies are excluded. App features will be lost; backups are inventories, not automatic restore images."/>
       <TextBlock Name="BackupLocation" Foreground="#C9D3DC" TextWrapping="Wrap" Margin="0,8,0,0"/>
       <TextBlock Foreground="#C9D3DC" TextWrapping="Wrap" Margin="0,8,0,0" Text="Network blocking leaves microphone permission unchanged, but stops calls and uploads from the selected executable. Other apps and helper processes are not covered."/>
     </StackPanel>
@@ -94,7 +100,7 @@ function Get-GuardWindowBounds {
       <Button Name="Refresh" Content="Refresh suggestions" Padding="12,8" Margin="0,0,8,8"/>
       <Button Name="Apply" Content="Apply privacy baseline" Padding="12,8" Margin="0,0,8,8"/>
       <Button Name="UndoPrivacy" Content="Undo privacy settings..." Padding="12,8" Margin="0,0,8,8"/>
-      <Button Name="Debloat" Content="Remove listed optional apps" Padding="12,8" Margin="0,0,8,8"/>
+      <Button Name="Debloat" Content="Remove checked entries..." Padding="12,8" Margin="0,0,8,8"/>
       <Button Name="LocalOnly" Content="Block an app's network..." Padding="12,8" Margin="0,0,8,8"/>
       <Button Name="UndoNetwork" Content="Restore app network..." Padding="12,8" Margin="0,0,8,8"/>
     </WrapPanel>
@@ -121,6 +127,9 @@ $localOnly = $window.FindName('LocalOnly')
 $undoPrivacy = $window.FindName('UndoPrivacy')
 $undoNetwork = $window.FindName('UndoNetwork')
 $lastAction = $window.FindName('LastAction')
+$checkAll = $window.FindName('CheckAll')
+$uncheckAll = $window.FindName('UncheckAll')
+$canInspectProvisioned = $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $window.FindName('BackupLocation').Text = "Default backup folder: $backupRoot"
 if ($PreviewOnly) {
     $window.FindName('PreviewBanner').Visibility = 'Visible'
@@ -129,6 +138,8 @@ if ($PreviewOnly) {
 
 function Refresh-View {
     $viewState.ReadSucceeded = $false
+    $candidates.Items.Clear()
+    Update-CleanupSelection
     try {
         $auditJson = (& $baselineScript -Mode Audit) -join [Environment]::NewLine
         $audit = ConvertFrom-Json -InputObject $auditJson
@@ -140,24 +151,78 @@ function Refresh-View {
             "$mark $($_.Description)"
         }) -join [Environment]::NewLine
 
-        $candidates.Items.Clear()
-        $suggestionsJson = (& $debloatScript -Mode Preview) -join [Environment]::NewLine
+        $notice = $window.FindName('ProvisionedNotice')
+        $notice.Text = if ($canInspectProvisioned) { 'Provisioned copies affect future accounts; they do not uninstall other existing accounts.' } else { 'Open as administrator to also list provisioned copies for new accounts.' }
+        try {
+            $suggestionsJson = (& $debloatScript -Mode Preview -IncludeProvisioned:$canInspectProvisioned) -join [Environment]::NewLine
+        } catch {
+            if (-not $canInspectProvisioned) { throw }
+            $notice.Text = 'Provisioned copies could not be inspected; only this account is listed. ' + $_.Exception.Message
+            $suggestionsJson = (& $debloatScript -Mode Preview) -join [Environment]::NewLine
+        }
         $suggestions = ConvertFrom-Json -InputObject $suggestionsJson
         if ($suggestions -isnot [array]) { $suggestions = @($suggestions) }
         foreach ($item in $suggestions) {
             if ($item.PSObject.Properties.Name -contains 'Name') {
-                [void]$candidates.Items.Add("$($item.DisplayName) ($($item.Name))")
+                if ($item.Scope -notin @('CurrentUser','Provisioned') -or -not $item.FullName) { throw 'Invalid optional-app preview entry.' }
+                $scopeLabel = if ($item.Scope -eq 'Provisioned') { 'Provisioned - new accounts' } else { 'Installed - this account' }
+                $checkbox = [System.Windows.Controls.CheckBox]::new()
+                $checkbox.IsChecked = $false
+                $checkbox.Foreground = [System.Windows.Media.Brushes]::White
+                $checkbox.Margin = [System.Windows.Thickness]::new(4,5,4,5)
+                $checkbox.Tag = $item
+                $label = [System.Windows.Controls.TextBlock]::new()
+                $label.Text = "$($item.DisplayName) - $scopeLabel`n$($item.Name)"
+                $label.TextWrapping = 'Wrap'
+                $checkbox.Content = $label
+                $checkbox.ToolTip = $item.Effect
+                $checkbox.Add_Checked({ Update-CleanupSelection })
+                $checkbox.Add_Unchecked({ Update-CleanupSelection })
+                [void]$candidates.Items.Add($checkbox)
             }
         }
         if ($candidates.Items.Count -eq 0) {
             [void]$candidates.Items.Add('No allowlisted optional apps found.')
         }
         $viewState.ReadSucceeded = $true
+        Update-CleanupSelection
     }
     catch {
         $status.Text = 'Unable to read current settings'
         $details.Text = $_.Exception.Message
+        $candidates.Items.Clear()
+        Update-CleanupSelection
     }
+}
+
+function Get-CheckedCleanupEntries {
+    foreach ($item in $candidates.Items) {
+        if ($item -is [System.Windows.Controls.CheckBox] -and $item.IsChecked -eq $true) { $item.Tag }
+    }
+}
+
+function Update-CleanupSelection {
+    $count = @(Get-CheckedCleanupEntries).Count
+    $window.FindName('SelectionCount').Text = "$count checked"
+    $debloat.IsEnabled = (-not $PreviewOnly -and $viewState.ReadSucceeded -and $count -gt 0)
+}
+
+function Set-AllCleanupChecks {
+    param([bool] $Checked)
+    foreach ($item in $candidates.Items) {
+        if ($item -is [System.Windows.Controls.CheckBox] -and $item.IsEnabled) { $item.IsChecked = $Checked }
+    }
+    Update-CleanupSelection
+}
+
+function Get-CleanupConfirmation {
+    param([object[]] $Entries)
+    if (@($Entries).Count -eq 0) { throw 'Check at least one optional entry first.' }
+    $lines = @($Entries | ForEach-Object {
+        $scopeLabel = if ($_.Scope -eq 'Provisioned') { 'provisioned for new accounts' } else { 'this account' }
+        "$($_.DisplayName) [$scopeLabel]`n$($_.Effect)"
+    }) -join "`n`n"
+    "Remove ONLY these $($Entries.Count) checked entries?`n`n$lines`n`nProvisioned removal affects future accounts, not other existing accounts. Manual reinstall/reprovisioning may be required. There is no automatic app undo. Continue?"
 }
 
 # Shared by button handlers and fixture-backed workflow tests.
@@ -166,9 +231,11 @@ function Invoke-GuardAction {
         [ValidateSet('PrivacyApply', 'PrivacyUndo', 'DebloatApply', 'NetworkApply', 'NetworkUndo')]
         [string] $Action,
         [string] $BackupFile,
-        [string] $ProgramPath
+        [string] $ProgramPath,
+        [string] $SelectionJson
     )
     if ($PreviewOnly) { throw 'System-changing actions are disabled in preview mode.' }
+    if ($Action -eq 'DebloatApply' -and [string]::IsNullOrWhiteSpace($SelectionJson)) { throw 'Check at least one optional entry first.' }
     $isApply = $Action -in @('PrivacyApply', 'DebloatApply', 'NetworkApply')
     if ($isApply) {
         $prefix = switch ($Action) { 'PrivacyApply' { 'privacy-baseline' } 'DebloatApply' { 'debloat' } 'NetworkApply' { 'local-only' } }
@@ -179,7 +246,7 @@ function Invoke-GuardAction {
         $raw = switch ($Action) {
             'PrivacyApply' { & $baselineScript -Mode Apply -BackupFile $BackupFile }
             'PrivacyUndo' { & $baselineScript -Mode Rollback -BackupFile $BackupFile }
-            'DebloatApply' { & $debloatScript -Mode Apply -BackupFile $BackupFile }
+            'DebloatApply' { & $debloatScript -Mode Apply -BackupFile $BackupFile -SelectionJson $SelectionJson }
             'NetworkApply' { & $localOnlyScript -Mode Apply -BackupFile $BackupFile -ProgramPath $ProgramPath }
             'NetworkUndo' { & $localOnlyScript -Mode Rollback -BackupFile $BackupFile }
         }
@@ -219,14 +286,19 @@ function Select-RecoveryBackup {
 }
 
 $refresh.Add_Click({ Refresh-View })
+$checkAll.Add_Click({ Set-AllCleanupChecks -Checked $true })
+$uncheckAll.Add_Click({ Set-AllCleanupChecks -Checked $false })
 $apply.Add_Click({
     try { Invoke-GuardAction -Action PrivacyApply } catch { Show-ActionError $_ }
 })
 $debloat.Add_Click({
-    $answer = [System.Windows.MessageBox]::Show('This removes all listed optional apps for the current user. Protected Windows components and provisioned packages are excluded. Removed apps must be reinstalled manually; there is no automatic app undo. Continue?', 'Confirm optional cleanup', 'YesNo', 'Warning')
-    if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
     try {
-        Invoke-GuardAction -Action DebloatApply
+        $entries = @(Get-CheckedCleanupEntries)
+        $confirmation = Get-CleanupConfirmation -Entries $entries
+        $selection = ConvertTo-Json -InputObject @($entries | Select-Object Name,FullName,Scope) -Depth 5 -Compress
+        $answer = [System.Windows.MessageBox]::Show($confirmation, 'Confirm checked optional entries', 'YesNo', 'Warning', 'No')
+        if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+        Invoke-GuardAction -Action DebloatApply -SelectionJson $selection
     }
     catch {
         Show-ActionError $_

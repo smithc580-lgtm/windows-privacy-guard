@@ -2,10 +2,10 @@
 
 An audit-first, reversible Windows 11 privacy baseline.
 
-**Public release: tested build 0.1.0-rc.3.** The validated candidate has been
-promoted to a regular release; its tag and installer bytes are unchanged.
+**Public release: 0.1.1.** Includes individual optional-app checkboxes and
+separate choices for installed and provisioned copies.
 Use the packaged ZIP
-from [GitHub Releases](https://github.com/smithc580-lgtm/windows-privacy-guard/releases/tag/v0.1.0-rc.3),
+from [GitHub Releases](https://github.com/smithc580-lgtm/windows-privacy-guard/releases/tag/v0.1.1),
 not GitHub's automatic source-code ZIP, for the installer with its manifest.
 See [validation scope and test instructions](docs/TESTING.md).
 
@@ -115,15 +115,40 @@ require a restart and is intentionally explicit:
 .\scripts\Invoke-WindowsPrivacyBaseline.ps1 -Mode Apply -RemoveRecall
 ```
 
-The optional debloater uses a strict allowlist of current-user consumer apps.
-It never removes unknown packages, provisioned packages, or protected Windows
-components. It is separate from the privacy baseline because app removal can
-affect a user's workflow. The GUI shows suggestions first and requires a
-confirmation before removing listed apps.
+The optional debloater uses a strict allowlist. Every entry has a checkbox,
+initially unchecked, with **Check all** and **Uncheck all** above the list.
+Only checked entries are passed to the removal backend. Refresh clears choices.
+It is separate from the privacy baseline because removing an app removes its
+features and may affect a user's workflow.
+
+Apps installed for **this account** and copies **provisioned for new accounts**
+are separate choices. Check both entries to remove both scopes, or leave either
+unchecked to keep it. Provisioned removal prevents automatic installation for
+new accounts; it does not uninstall the app from other existing accounts.
+Administrator access is required to inspect provisioned copies. If their
+inventory cannot be read, the panel explains that only this account is listed.
+
+Unknown packages, protected Windows components, flagged frameworks/resources,
+non-removable packages, and detected shared dependencies are excluded. A
+confirmation lists the selected apps and their scopes before removal. The backend
+rechecks eligibility and exact package identities, saves a scoped inventory,
+and records completed operations and failures. Backups are not app restore
+images: reinstalling apps or restoring provisioning requires separate manual
+work. **There is no automatic app-removal undo.**
 
 ```powershell
 .\scripts\Invoke-WindowsDebloat.ps1 -Mode Preview
 ```
+
+For an elevated preview including provisioned copies, add `-IncludeProvisioned`.
+CLI Apply now requires `-SelectionJson`, a JSON array of exact `Name`, `FullName`,
+and `Scope` values from Preview (`CurrentUser` or `Provisioned`). Omitting the
+selection does not remove anything. Prefer the checkbox UI for interactive use.
+
+These checkbox/provisioning changes are included in version 0.1.1. The source
+UI, two real single-app removal/restoration rounds, two installer test rounds,
+and the user's local installation/desktop launch passed testing. See the
+validation notes for the scope of those checks.
 
 ### Local-only microphone protection
 

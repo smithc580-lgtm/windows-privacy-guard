@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+(-[a-z0-9.]+)?$')] [string] $Version = '0.1.0-rc.3',
+    [ValidatePattern('^\d+\.\d+\.\d+(-[a-z0-9.]+)?$')] [string] $Version = '0.1.1',
     [string] $OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist')
 )
 Set-StrictMode -Version Latest
